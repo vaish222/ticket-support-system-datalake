@@ -2,12 +2,9 @@ command:
   - "python"
   - "app.py"
 
-env:
-  - name: LAKEBASE_HOST
-    valueFrom:
-      lakebaseEndpointRef:
-        name: primary
-  - name: LAKEBASE_DATABASE
-    valueFrom:
-      lakebaseDatabaseRef:
-        name: databricks_postgres
+resources:
+  - name: lakebase-endpoint
+    description: Lakebase endpoint for ticket system database
+    postgres:
+      name: projects/ticket-support-system/branches/production/endpoints/primary
+      permission: ALL
