@@ -1,0 +1,13 @@
+command:
+  - "python"
+  - "app.py"
+
+env:
+  - name: LAKEBASE_HOST
+    valueFrom:
+      lakebaseEndpointRef:
+        name: primary
+  - name: LAKEBASE_DATABASE
+    valueFrom:
+      lakebaseDatabaseRef:
+        name: databricks_postgres
