@@ -40,20 +40,6 @@ The app uses these Lakebase resources:
 
 Full endpoint path: `projects/ticket-support-system/branches/production/endpoints/primary`
 
-### 2. Database Permissions
-
-The app's service principal needs CONNECT permission on the Lakebase branch.
-
-Grant permission via web terminal:
-```bash
-databricks postgres create-grant \
-  --parent projects/ticket-support-system/branches/production \
-  --json '{
-    "spec": {
-      "principal": "app-1lvsgr ticket-system-app-assignment1",
-      "role": "CONNECT"
-    }
-  }'
 ```
 
 ### 3. Deploy the App

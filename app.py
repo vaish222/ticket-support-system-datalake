@@ -2,39 +2,28 @@ from flask import Flask, render_template, request, jsonify
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from databricks.sdk import WorkspaceClient
+import base64
 import os
 
 app = Flask(__name__)
 
-# Database configuration
-ENDPOINT_PATH = "projects/ticket-support-system/branches/production/endpoints/primary"
-DATABASE = "databricks_postgres"
+# Secret configuration
+SECRET_SCOPE = os.environ.get("LAKEBASE_SECRET_SCOPE", "database")
+SECRET_KEY = os.environ.get("LAKEBASE_SECRET_KEY", "lakebase-url")
+
+def get_lakebase_url():
+    """Fetch the Lakebase connection URL from Databricks secrets."""
+    w = WorkspaceClient()
+    secret = w.secrets.get_secret(scope=SECRET_SCOPE, key=SECRET_KEY)
+    return base64.b64decode(secret.value).decode("utf-8")
 
 def get_db_connection():
-    """Create a connection to the Lakebase database using service principal."""
-    w = WorkspaceClient()
+    """Create a connection to Lakebase using native password authentication."""
+    # Get the connection URL (format: postgresql://user:password@host:port/database?sslmode=require)
+    lakebase_url = get_lakebase_url()
     
-    # Get endpoint host
-    ep = w.postgres.get_endpoint(name=ENDPOINT_PATH)
-    host = ep.status.hosts.host
-    
-    # Get service principal name (app runs as service principal)
-    try:
-        current_user = w.current_user.me()
-        username = current_user.user_name
-    except:
-        # Fallback to service principal name if current_user fails
-        username = "app-1lvsgr ticket-system-app-assignment1"
-    
-    # Connect using service principal (no OAuth token required)
-    conn = psycopg2.connect(
-        host=host,
-        port=5432,
-        database=DATABASE,
-        user=username,
-        sslmode="require",
-        cursor_factory=RealDictCursor
-    )
+    # Connect using the URL which includes username and static password
+    conn = psycopg2.connect(lakebase_url, cursor_factory=RealDictCursor)
     return conn
 
 @app.route('/')

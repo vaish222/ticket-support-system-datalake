@@ -1,9 +1,10 @@
 """
 Lakebase database connection module for the support ticket system.
-Handles connection pooling using service principal authentication.
+Handles connection pooling using native password authentication.
 """
 
 import os
+import base64
 import psycopg2
 from psycopg2 import pool
 from databricks.sdk import WorkspaceClient
@@ -15,25 +16,15 @@ logger = logging.getLogger(__name__)
 _w = WorkspaceClient()
 _connection_pool = None
 
-
-def _get_host():
-    """Get the Lakebase endpoint host from environment."""
-    return os.environ.get("LAKEBASE_HOST")
-
-
-def _get_database():
-    """Get the Lakebase database name from environment."""
-    return os.environ.get("LAKEBASE_DATABASE", "databricks_postgres")
+# Secret configuration
+SECRET_SCOPE = os.environ.get("LAKEBASE_SECRET_SCOPE", "database")
+SECRET_KEY = os.environ.get("LAKEBASE_SECRET_KEY", "lakebase-url")
 
 
-def _get_username():
-    """Get the service principal username for Lakebase connection."""
-    try:
-        current_user = _w.current_user.me()
-        return current_user.user_name
-    except:
-        # Fallback to service principal name for Databricks Apps
-        return "app-1lvsgr ticket-system-app-assignment1"
+def _get_lakebase_url():
+    """Fetch the Lakebase connection URL from Databricks secrets."""
+    secret = _w.secrets.get_secret(scope=SECRET_SCOPE, key=SECRET_KEY)
+    return base64.b64decode(secret.value).decode("utf-8")
 
 
 def get_connection_pool():
@@ -41,22 +32,15 @@ def get_connection_pool():
     global _connection_pool
     
     if _connection_pool is None:
-        host = _get_host()
-        database = _get_database()
+        lakebase_url = _get_lakebase_url()
         
-        if not host:
-            raise ValueError("LAKEBASE_HOST not configured")
+        logger.info("Creating connection pool to Lakebase")
         
-        logger.info(f"Creating connection pool to {host}/{database}")
-        
+        # Create pool using the connection URL (includes username and password)
         _connection_pool = psycopg2.pool.SimpleConnectionPool(
             minconn=1,
             maxconn=10,
-            host=host,
-            port=5432,
-            database=database,
-            user=_get_username(),
-            sslmode="require",
+            dsn=lakebase_url
         )
     
     return _connection_pool
