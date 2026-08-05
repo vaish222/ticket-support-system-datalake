@@ -225,5 +225,37 @@ def add_message(ticket_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/tickets/<int:ticket_id>', methods=['DELETE'])
+def delete_ticket(ticket_id):
+    """Delete a ticket and all its messages."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Verify ticket exists
+        cur.execute("SELECT ticket_id FROM tickets WHERE ticket_id = %s", (ticket_id,))
+        if not cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Ticket not found"}), 404
+        
+        # Delete all messages for this ticket first (foreign key constraint)
+        cur.execute("DELETE FROM ticket_messages WHERE ticket_id = %s", (ticket_id,))
+        
+        # Delete the ticket
+        cur.execute("DELETE FROM tickets WHERE ticket_id = %s", (ticket_id,))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({"message": "Ticket deleted successfully"}), 200
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    host = os.getenv('FLASK_RUN_HOST', '0.0.0.0')
+    port = int(os.getenv('FLASK_RUN_PORT', 8000))
+    app.run(debug=True, host=host, port=port)
+    print(f"Flask app running on http://{host}:{port}")
