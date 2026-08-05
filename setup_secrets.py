@@ -1,6 +1,5 @@
 """
-One-time setup script: creates the Databricks secret scope and stores the
-Massive API key. Run this locally (with the Databricks CLI configured) or
+One-time setup script: creates the Databricks secret scope. Run this locally (with the Databricks CLI configured) or
 from a notebook - never commit the resulting secret value anywhere.
 
 Usage:
@@ -12,7 +11,7 @@ import getpass
 
 w = WorkspaceClient()
 
-w.secrets.create_scope(scope="database")
+#w.secrets.create_scope(scope="database")
 w.secrets.put_secret(
     scope="database",
     key="lakebase-url",

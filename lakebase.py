@@ -1,13 +1,10 @@
 """
 Lakebase (Databricks-managed Postgres) connection helper.
 
-Connects using a single LAKEBASE_URL (a standard Postgres connection URL,
-e.g. postgresql://role:password@host:5432/databricks_postgres?sslmode=require)
-pointing at a native Postgres role with a static, non-expiring password.
-This keeps setup to a single secret instead of five separate env vars.
+Connects using service principal authentication.
+No OAuth tokens or secrets required.
 """
 
-import base64
 import os
 from contextlib import contextmanager
 
@@ -18,20 +15,45 @@ from sqlalchemy import create_engine
 
 _w = WorkspaceClient()
 
-_SCOPE = os.environ.get("LAKEBASE_SECRET_SCOPE", "database")
-_KEY = os.environ.get("LAKEBASE_SECRET_KEY", "lakebase-url")
+# Database configuration
+ENDPOINT_PATH = "projects/ticket-support-system/branches/production/endpoints/primary"
+DATABASE = os.environ.get("LAKEBASE_DATABASE", "databricks_postgres")
+
+
+def _get_connection_params() -> dict:
+    """Get connection parameters for Lakebase using service principal."""
+    # Get endpoint host
+    ep = _w.postgres.get_endpoint(name=ENDPOINT_PATH)
+    host = ep.status.hosts.host
+    
+    # Get service principal username
+    try:
+        current_user = _w.current_user.me()
+        username = current_user.user_name
+    except:
+        # Fallback for Databricks Apps service principal
+        username = "app-1lvsgr ticket-system-app-assignment1"
+    
+    return {
+        "host": host,
+        "port": 5432,
+        "database": DATABASE,
+        "user": username,
+        "sslmode": "require"
+    }
 
 
 def _lakebase_url() -> str:
-    """Fetch and decode the Lakebase connection URL from the Databricks secret scope."""
-    secret = _w.secrets.get_secret(scope=_SCOPE, key=_KEY)
-    return base64.b64decode(secret.value).decode("utf-8")
+    """Build Lakebase connection URL using service principal."""
+    params = _get_connection_params()
+    return f"postgresql://{params['user']}@{params['host']}:{params['port']}/{params['database']}?sslmode={params['sslmode']}"
 
 
 @contextmanager
 def get_connection():
     """Yield a raw psycopg2 connection with a RealDictCursor factory."""
-    conn = psycopg2.connect(_lakebase_url(), cursor_factory=RealDictCursor)
+    params = _get_connection_params()
+    conn = psycopg2.connect(**params, cursor_factory=RealDictCursor)
     try:
         yield conn
     finally:

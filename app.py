@@ -11,27 +11,27 @@ ENDPOINT_PATH = "projects/ticket-support-system/branches/production/endpoints/pr
 DATABASE = "databricks_postgres"
 
 def get_db_connection():
-    """Create a connection to the Lakebase database."""
+    """Create a connection to the Lakebase database using service principal."""
     w = WorkspaceClient()
     
     # Get endpoint host
     ep = w.postgres.get_endpoint(name=ENDPOINT_PATH)
     host = ep.status.hosts.host
     
-    # Generate OAuth token
-    credential = w.postgres.generate_database_credential(endpoint=ENDPOINT_PATH)
+    # Get service principal name (app runs as service principal)
+    try:
+        current_user = w.current_user.me()
+        username = current_user.user_name
+    except:
+        # Fallback to service principal name if current_user fails
+        username = "app-1lvsgr ticket-system-app-assignment1"
     
-    # Get current user
-    current_user = w.current_user.me()
-    username = current_user.user_name
-    
-    # Connect
+    # Connect using service principal (no OAuth token required)
     conn = psycopg2.connect(
         host=host,
         port=5432,
         database=DATABASE,
         user=username,
-        password=credential.token,
         sslmode="require",
         cursor_factory=RealDictCursor
     )

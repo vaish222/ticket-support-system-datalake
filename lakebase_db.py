@@ -1,6 +1,6 @@
 """
 Lakebase database connection module for the support ticket system.
-Handles connection pooling and OAuth token management.
+Handles connection pooling using service principal authentication.
 """
 
 import os
@@ -26,16 +26,14 @@ def _get_database():
     return os.environ.get("LAKEBASE_DATABASE", "databricks_postgres")
 
 
-def _generate_token():
-    """Generate a fresh OAuth token for Lakebase connection."""
-    host = _get_host()
-    if not host:
-        raise ValueError("LAKEBASE_HOST environment variable not set")
-    
-    # Extract endpoint path from host for token generation
-    # Host format: <endpoint>.cloud.databricks.com
-    credential = _w.postgres.generate_database_credential(endpoint=host)
-    return credential.password
+def _get_username():
+    """Get the service principal username for Lakebase connection."""
+    try:
+        current_user = _w.current_user.me()
+        return current_user.user_name
+    except:
+        # Fallback to service principal name for Databricks Apps
+        return "app-1lvsgr ticket-system-app-assignment1"
 
 
 def get_connection_pool():
@@ -57,8 +55,7 @@ def get_connection_pool():
             host=host,
             port=5432,
             database=database,
-            user="token",
-            password=_generate_token(),
+            user=_get_username(),
             sslmode="require",
         )
     
